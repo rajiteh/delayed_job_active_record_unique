@@ -12,9 +12,9 @@ be unique within the queue.
 
 Given a situation where a Job may overwrite some value every time it gets run (ie: batch imports), it makes 
 sense to only keep the latest job on queue. DelayedJob provides named queues as a method to identify jobs however, 
-using queue names to identify a large number of jobs is not feasible as the number of queues will grow  
-and scaling will be difficult. This gem extends the DelayedJob table with a new column that will store a unique key 
-from the handler thus will be able to detect if the specific job is already queued.
+using queue names to identify a large number of jobs is not feasible as the number of queues will grow and scaling
+will be difficult. This gem extends the DelayedJob table with a new column that will store a unique key from the
+handler thus will be able to detect if the specific job is already queued.
 
 Example scenarios: Batching e-mail notifications or performing indexing tasks.
 
@@ -45,11 +45,11 @@ delayed_job table.
 Uniqueness of the job can be specified by passing the key `unique_job` to the DelayedJob enqueue call. 
 
 ```ruby
-    unique_job: {
-        attr: :id # Required. A method name in the object that will be called to obtain a uniquely identifiable value.
-        replace: true # Optional. Default = false. # Default behaviour will not enqueue a job that already exists.
-                      # On true, Any job that is already queued under this unique ID will be replaced by the current.
-    }
+unique_job: {
+    attr: :id # Required. A method name in the object that will be called to obtain a uniquely identifiable value.
+    replace: true # Optional. Default = false. # Default behaviour will not enqueue a job that already exists.
+                  # On true, Any job that is already queued under this unique ID will be replaced by the current.
+}
 ```
 
 It is possible to just supply a `Symbol` to `unique_job` to set the attr value and proceed with default options.
@@ -60,14 +60,14 @@ It is possible to just supply a `Symbol` to `unique_job` to set the attr value a
 If using `#handle_asynchronously`
 
 ```ruby
-    handle_asynchronously :solr_index, queue: 'solr_indexing', priority: 50, unique_job: { attr: :id, replace: true }
+handle_asynchronously :solr_index, queue: 'solr', priority: 50, unique_job: { attr: :id, replace: true }
 ```
 
 If using a standalone class
 
 ```ruby
-    Delayed::Job.enqueue NewsletterJob.new('lorem ipsum...', Customers.pluck(:email)), unique_job: :get_id
-    #NewsLetterJob must have a 'get_id' method that will return a unique value to it's context.
+Delayed::Job.enqueue NewsletterJob.new('lorem ipsum...', Customers.pluck(:email)), unique_job: :get_id
+#NewsLetterJob must have a 'get_id' method that will return a unique value to it's context.
 ```
 
 
