@@ -6,14 +6,14 @@ describe Delayed::Backend::Base::ClassMethods::UniqueJob do
   let(:payload_object) { double(unique_prop: 99) }
   let(:queue_name) { 'test_queue' }
 
-  describe '#attr' do
+  describe '#initialize' do
 
     shared_examples(:gets_attr) do
-      it { expect(unique_job.attr).to eq "unique_prop" }
+      it { expect(unique_job.key).to eq "#{payload_object.unique_prop}" }
     end
 
     shared_context(:fails_to_get_attr) do
-      it { expect{unique_job.attr}.to raise_error(ArgumentError)}
+      it { expect{unique_job}.to raise_error(ArgumentError)}
     end
 
     context 'options passed as a hash' do
@@ -43,6 +43,53 @@ describe Delayed::Backend::Base::ClassMethods::UniqueJob do
 
     end
 
+    context 'unique_job in the custom class' do
+
+        before { payload_object.stub(:unique_job) { 99 } } #TODO: Remove hard coded value
+        before { payload_object.stub(:unique_job_replace?) { true } }
+
+        let(:unique_job) do
+          subject.new payload_object: payload_object,
+                      queue: 'some_queue'
+        end
+        it { expect(unique_job.replace_job?).to be true }
+        it_behaves_like :gets_attr
+    end
+
+    context 'options contains a proc' do
+      context 'passed as a value' do
+        let(:unique_job) do
+          subject.new payload_object: payload_object,
+                      queue: 'some_queue',
+                      unique_job: Proc.new {|payload| payload.unique_prop }
+        end
+
+        it_behaves_like :gets_attr
+      end
+
+      context 'passed as a hash' do
+        let(:unique_job) do
+          subject.new payload_object: payload_object,
+                      queue: 'some_queue',
+                      unique_job: { attr: Proc.new {|payload| payload.unique_prop } }
+        end
+
+        it_behaves_like :gets_attr
+      end
+
+
+
+    end
+    context 'custom class with queue definition' do
+      before { payload_object.stub(:queue_name) { 'test_queue' } }
+      let(:unique_job) do
+        subject.new payload_object: payload_object,
+                    unique_job: :unique_prop
+      end
+
+      it_behaves_like :gets_attr
+    end
+
     context 'blank opts' do
       let(:unique_job) do
         subject.new payload_object: payload_object,
@@ -65,24 +112,13 @@ describe Delayed::Backend::Base::ClassMethods::UniqueJob do
 
     end
 
-    context 'custom class with queue definition' do
+    context 'no queue' do
       let(:unique_job) do
-        job_id = 'abcdef'
-        cj = CustomJob.new(job_id)
-        cj.queue_name= 'class_queue'
-        subject.new payload_object: cj,
+        subject.new payload_object: payload_object,
                     unique_job: :unique_prop
       end
 
-      it_behaves_like :gets_attr
-    end
-
-    context 'no queue' do
-
-      it do
-        opts = {payload_object: payload_object, unique_job: :unique_prop}
-        expect{subject.new opts}.to raise_error(ArgumentError)
-      end
+      it_behaves_like :fails_to_get_attr
 
     end
 

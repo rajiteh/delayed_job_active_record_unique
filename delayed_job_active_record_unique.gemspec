@@ -4,7 +4,7 @@ $LOAD_PATH.unshift(lib) unless $LOAD_PATH.include?(lib)
 
 Gem::Specification.new do |spec|
   spec.name          = "delayed_job_active_record_unique"
-  spec.version       = "0.0.1"
+  spec.version       = "0.0.2"
   spec.authors       = ["Rajitha Perera"]
   spec.email         = ["rajiteh@gmail.com"]
   spec.summary       = %q{Extend DelayedJob to support unique job indentification.}

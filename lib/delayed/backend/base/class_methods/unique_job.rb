@@ -7,35 +7,55 @@ module Delayed
         class UniqueJob
           ERROR_NO_QUEUE = ":queue MUST be specified in the options or a method "\
                            "queue_name must exist in the object for unique_job enqueue."
-          ERROR_BAD_ARGS = "'unique_job' must be one of: Hash with 'attr' key, a Symbol "\
-                           "or non blank String."
+          ERROR_BAD_ARGS = "'unique_job' must be one of: Hash with key 'attr', a Symbol "\
+                           "or non blank String and must be supplied with enqueue options "\
+                           "or provided via a method named `unique_job` in the enqueued class."
 
           attr_accessor :opts
+          attr_accessor :key
+          
           def initialize(opts)
             self.opts = opts
 
-            if self.opts.has_key?(:unique_job)
-              self.opts[:queue] ||= class_queue_name #get class queue if specified
-              raise ArgumentError.new ERROR_NO_QUEUE if opts[:queue].nil?
+            if detect_unique_job!
+              uj = self.opts[:unique_job]
+              puts "UJ: #{uj.inspect}"
+              candidate = if uj.is_a?(Hash)
+                            if uj[:attr].is_a?(Proc)
+                              uj[:attr].call(opts[:payload_object])
+                            else
+                              get_value_of(uj[:attr]) unless uj[:attr].blank?
+                            end
+                          elsif (uj.is_a?(String) || uj.is_a?(Symbol))
+                            get_value_of(uj) unless uj.blank?
+                          elsif uj.is_a?(Proc)
+                            uj.call(opts[:payload_object])
+                          end
+
+              raise ArgumentError.new ERROR_NO_QUEUE unless detect_queue_name!
+              puts "CANDIDATE: #{candidate}"
+              raise ArgumentError.new ERROR_BAD_ARGS if candidate.blank?
+
+              self.key = "#{candidate}"
             else
-              @attr = false
+              disable_unique_job!
             end
           end
 
-          def attr
-            @attr ||= opts.has_key?(:unique_job) &&
-                begin
-                  candidate = opts[:unique_job].is_a?(Hash) ? opts[:unique_job][:attr] : opts[:unique_job]
-                  if (candidate.is_a?(String) || candidate.is_a?(Symbol)) && !candidate.blank?
-                    "#{candidate}"
-                  else
-                    raise ArgumentError.new ERROR_BAD_ARGS
-                  end
-                end
+          def get_value_of(attr)
+            if opts[:payload_object].is_a? Delayed::PerformableMethod
+              opts[:payload_object].object.send(attr)
+            else
+              opts[:payload_object].send(attr)
+            end
+          end
+
+          def disable_unique_job!
+            self.key = false
           end
 
           def require_unique?
-            attr != false
+            key != false
           end
 
           def replace_job?
@@ -53,24 +73,35 @@ module Delayed
           end
 
           def ready_to_run_uniquely
-            Delayed::Job.ready_to_run('', Delayed::Worker.max_run_time).where(:unique_id => generate_key)
+            Delayed::Job.ready_to_run('', Delayed::Worker.max_run_time).where(:unique_id => slugged_key)
           end
 
-          def generate_key
-            @key ||= if opts[:payload_object].is_a? Delayed::PerformableMethod
-                       "#{opts[:queue]}_#{opts[:payload_object].object.send(attr)}"
-                     else
-                       "#{opts[:queue]}_#{opts[:payload_object].send(attr)}"
-                     end
+          def slugged_key
+            @slugged_key ||= "#{opts[:queue]}_#{key}"
           end
 
-          def class_queue_name
-            unless opts[:payload_object].is_a? Delayed::PerformableMethod
-              opts[:payload_object].queue_name if opts[:payload_object].respond_to? :queue_name
-            end
+          def detect_unique_job!
+            self.opts.has_key?(:unique_job) ||
+                (opts[:payload_object].respond_to? :unique_job) &&
+                    (opts[:unique_job] = { attr: Proc.new { opts[:payload_object].unique_job } } ) &&
+                    (detect_unique_job_replace! || true)
+
+
           end
+
+          def detect_unique_job_replace!
+            (opts[:payload_object].respond_to? :unique_job_replace?) &&
+                (opts[:unique_job][:replace] = opts[:payload_object].unique_job_replace?)
+          end
+
+          def detect_queue_name!
+            self.opts.has_key?(:queue) ||
+                (opts[:payload_object].respond_to? :queue_name) &&
+                    (opts[:queue] = opts[:payload_object].queue_name)
+          end
+
           def enqueue_opts
-            require_unique? ? opts.except(:unique_job).merge(unique_id: generate_key) : opts
+            require_unique? ? opts.except(:unique_job).merge(unique_id: slugged_key) : opts
           end
 
         end

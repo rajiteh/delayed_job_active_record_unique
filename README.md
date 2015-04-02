@@ -45,32 +45,75 @@ delayed_job table.
 Uniqueness of the job can be specified by passing the key `unique_job` to the DelayedJob enqueue call. 
 
 ```ruby
-    unique_job: {
-        attr: :id # Required. A method name in the object that will be called to obtain a uniquely identifiable value.
-        replace: true # Optional. Default = false. # Default behaviour will not enqueue a job that already exists.
-                      # On true, Any job that is already queued under this unique ID will be replaced by the current.
-    }
+unique_job: {
+    attr: :id # Required. A method name in the object that will be called to obtain a uniquely identifiable value.
+    replace: true # Optional. Default = false.
+                  # Default behaviour will not enqueue a job that already exists.
+                  # On true, Any job that is already queued under this unique ID will be replaced by the current.
+}
 ```
 
 It is possible to just supply a `Symbol` to `unique_job` to set the attr value and proceed with default options.
 
+
 *Note:* You must supply a `queue` name to enqueue options or via class method `queue_name` as the uniqueness is only global to the queue.  
-## Example
+
+### Example
 
 If using `#handle_asynchronously`
 
 ```ruby
-    handle_asynchronously :solr_index, queue: 'solr_indexing', priority: 50, unique_job: { attr: :id, replace: true }
+handle_asynchronously :solr_index, queue: 'solr_indexing', priority: 50, unique_job: { attr: :id, replace: true }
 ```
 
 If using a standalone class
 
 ```ruby
-    Delayed::Job.enqueue NewsletterJob.new('lorem ipsum...', Customers.pluck(:email)), unique_job: :get_id
-    #NewsLetterJob must have a 'get_id' method that will return a unique value to it's context.
+Delayed::Job.enqueue NewsletterJob.new('lorem ipsum...'), queue: 'news_letters', unique_job: :get_id
+#NewsLetterJob must have a 'get_id' method that will return a unique value to it's context.
 ```
 
+### Using Procs
 
+Version 0.0.2 supports Procs as 'attr' values. The proc will be evaluated with the payload sent as the first argument. 
+ 
+```ruby
+unique_job: {
+    attr: Proc.new { |obj| "custom_attr_#{obj.id}" }
+    replace: true
+}
+# OR
+unique_job: Proc.new { |obj| "custom_attr_#{obj.id}" }
+```
+ 
+### Standalone Classes
+ 
+If not supplied as an option, Unique Job will look for methods `delayed_job` and `delayed_job_replace?` methods in the
+enqueued object and configure it self accordingly.
+
+```ruby
+class NewsletterJob < Struct.new(:some_object)
+
+    def unique_job
+        "#{some_object.length}_can_manipulate"
+    end
+    
+    def unique_job_replace?
+        true
+    end
+    
+    def queue_name
+        'new_letters_ftw'
+    end
+    
+    def perform
+        #some stuff happening here
+    end
+    
+end
+Delayed::Job.enqueue NewsletterJob.new('lorem ipsum...')
+```
+ 
 ## Contributing
 
 1. Fork it ( https://github.com/rajiteh/delayed_job_active_record_unique/fork )
