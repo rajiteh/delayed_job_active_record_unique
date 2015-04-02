@@ -88,14 +88,14 @@ unique_job: Proc.new { |obj| "custom_attr_#{obj.id}" }
  
 ### Standalone Classes
  
-If not supplied as an option, Unique Job will look for methods `delayed_job` and `delayed_job_replace?` methods in the
+If not supplied as an option, Unique Job will look for methods `unique_job` and `unique_job_replace?` methods in the
 enqueued object and configure it self accordingly.
 
 ```ruby
 class NewsletterJob < Struct.new(:some_object)
 
     def unique_job
-        "#{some_object.length}_can_manipulate"
+        "my_awesome_unique_id"
     end
     
     def unique_job_replace?
@@ -103,7 +103,7 @@ class NewsletterJob < Struct.new(:some_object)
     end
     
     def queue_name
-        'new_letters_ftw'
+        'news_letters_ftw'
     end
     
     def perform
@@ -111,6 +111,7 @@ class NewsletterJob < Struct.new(:some_object)
     end
     
 end
+
 Delayed::Job.enqueue NewsletterJob.new('lorem ipsum...')
 ```
  
