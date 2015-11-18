@@ -19,7 +19,6 @@ module Delayed
 
             if detect_unique_job!
               uj = self.opts[:unique_job]
-              puts "UJ: #{uj.inspect}"
               candidate = if uj.is_a?(Hash)
                             if uj[:attr].is_a?(Proc)
                               uj[:attr].call(opts[:payload_object])
@@ -33,7 +32,6 @@ module Delayed
                           end
 
               raise ArgumentError.new ERROR_NO_QUEUE unless detect_queue_name!
-              puts "CANDIDATE: #{candidate}"
               raise ArgumentError.new ERROR_BAD_ARGS if candidate.blank?
 
               self.key = "#{candidate}"
